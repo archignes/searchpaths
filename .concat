@@ -1,0 +1,13 @@
+preamble: |
+  // This file is a concatenation of key files in a web application.
+  // name: 
+  // description: 
+  // stack: 
+  // author: Daniel Griffin
+  // license: MIT
+  // version: 0.1.0
+ignores:
+  - package-lock.json
+  - yarn.lock
+  - .git
+  
