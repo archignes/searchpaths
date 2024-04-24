@@ -9,42 +9,49 @@ from export import export_searches
 from extract import (get_search_engine_percentages, get_surrounding_history,
                      load_cache)
 
-def print_search_lines(history_item: dict):
-        if 'search_query' in history_item and history_item['search_query']:
-                print()
-                system_line = f"{' '*6}{'System:':<8}{history_item['search_engine']:<13}"
-                print(system_line)
-                query_line = f"{' '*6}{'Query:':<8}[{history_item['search_query']}]"
-                wrapped_query_line = '\n'.join(textwrap.wrap(query_line, width=80, 
-                                              subsequent_indent=' ' * 14))
-                print(wrapped_query_line)
+from typing import List
+from searchpath_types import HistoryItem
 
+def print_search_lines(history_item: dict):
+    if 'search_engine' in history_item and history_item['search_engine']:
+        print()
+        system_line = f"{' '*6}{'System:':<8}{history_item['search_engine']:<13}"
+        print(system_line)
+        if 'search_label' in history_item and history_item['search_label']:
+            label_line = f"{' '*6}{'Label:':<8}[{history_item['search_label']}]"
+            wrapped_label_line = '\n'.join(textwrap.wrap(label_line, width=80, 
+                                          subsequent_indent=' ' * 14))
+            print(wrapped_label_line)
+        if 'search_query' in history_item and history_item['search_query']:
+            query_line = f"{' '*6}{'Query:':<8}[{history_item['search_query']}]"
+            wrapped_query_line = '\n'.join(textwrap.wrap(query_line, width=80, 
+                                          subsequent_indent=' ' * 14))
+            print(wrapped_query_line)
 
 def print_history_items(records, url=None):
-    print(f"{'Index':<6}{'Last Visit Time':<25}{'URL'}")
+    print(f"{'Index':<6}{'  Last Visit Time':<25}{'URL'}")
     divider = "-" * 80
     print(divider)
 
     for n, history_item in enumerate(records, start=1):
         last_visit_time = history_item['last_visit_time']
         url_item = history_item['url'].strip()
-        full_line = f"{n:<6}{last_visit_time:<25}{url_item}"
-        wrapped_line = '\n'.join(textwrap.wrap(full_line, width=80, 
-                                              subsequent_indent=' ' * 31))
+        full_line = f"{n:<6}{last_visit_time:<25}"
+        url_line = f"{" "*6}URL: {url_item}"
+        wrapped_line = '\n'.join(textwrap.wrap(full_line, width=80))
         if history_item['url'] == url:
-            print(divider)
-            print()
             print(f"{'         **Subject Search Entry**     '}")
             print()
             print(f"{wrapped_line}")
             print_search_lines(history_item)
+            print(f"{url_line}")
             print()
             print(divider)
         else:
             print(f"{wrapped_line}")
             print_search_lines(history_item)
+            print(f"{url_line}")
             print(divider)
-        print()
     print(divider)
 
 
@@ -200,7 +207,8 @@ def particular_investigation(data):
     investigation_user_interaction(data, selected_engine_searches)
 
 
-def dive_into_search_context(search: dict) -> None:
+
+def dive_into_search_context(search: HistoryItem, context_window: int = 3) -> None:
     """
     Allows the user to dive into the context of a search for a specific week.
 
@@ -209,9 +217,15 @@ def dive_into_search_context(search: dict) -> None:
     """
     url = search['url']
     history = load_cache()
-    surrounding_history = get_surrounding_history(url, history, context_window=3)
+    surrounding_history = get_surrounding_history(url, history, context_window=context_window)
     print("\nSurrounding History\n")
     print_history_items(surrounding_history, url=url)
+    print("Submit a number to expand the context window (less than 50) or "
+          "press enter to exit:")
+    input_window_size = input()
+    if input_window_size.isdigit() and int(input_window_size) < 50:
+        context_window = int(input_window_size)
+        return dive_into_search_context(search, context_window)
 
 
 def investigation_user_interaction(data, selected_engine_searches=None):
@@ -259,7 +273,57 @@ def investigation_user_interaction(data, selected_engine_searches=None):
                 print("Invalid option. Please try again.")
 
 
+
+def fzf_search_queries(history: List[HistoryItem]):
+    """
+    Allows the user to select a search query from the history using fzf (fuzzy finder),
+    and then dives into the search context of the selected query.
+
+    Parameters:
+    - history (list of HistoryItem): The search history containing search queries and labels.
+    
+    This function filters out entries with certain labels such as 'redirect', 'duplicate', and
+    others, and then presents the remaining queries to the user to select using fzf. If multiple
+    entries are found for a selected query, the user is prompted again to select one specific entry.
+    """
+    fzf = FzfPrompt()
+    filtered_search_history = [
+        entry for entry in history 
+        if entry.get("search_query") and 
+        entry.get("search_label", None) not in [
+            "redirect", "duplicate", "chat-based-search-complement", 
+            "not-url-based", "site_search", ""
+        ]
+    ]
+    search_queries = [item for item in filtered_search_history]
+    print(f"Total number of queries: {len(search_queries)}")
+    search_query_mapping = {}
+    for item in search_queries:
+        search_query = item["search_query"]
+        if search_query not in search_query_mapping:
+            search_query_mapping[search_query] = []
+        search_query_mapping[search_query].append(item)
+
+    # Create a list of search queries with their counts
+    search_query_options = [f"{search_query} ({len(search_query_mapping[search_query])})" for search_query in search_query_mapping]
+    # Sort the search queries by string in descending order ignoring case
+    search_query_options.sort(key=lambda x: x.lower())
+    selected_query = fzf.prompt(search_query_options, "--prompt='Select a search query: '")[0]
+    selected_query = selected_query.split(" (")[0]
+    
+    if selected_query:
+        selected_entries = search_query_mapping.get(selected_query, [])
+        if selected_entries:
+            if len(selected_entries) > 1:
+                selected_entry = fzf.prompt([str(entry) for entry in selected_entries], "--prompt='Multiple entries found. Select one: '")[0]
+                selected_entry = next(filter(lambda x: str(x) == selected_entry, selected_entries), None)
+            else:
+                selected_entry = selected_entries[0]
+            
+            dive_into_search_context(selected_entry)
+
 def interact_with_user_for_search_data(history, week_num=None, hide_complements=True):
+
     """
     Engages the user to present search engine usage percentages for a given
     week or a span of weeks, initiating with the current week's data, and
@@ -368,3 +432,4 @@ def interact_with_user_for_search_data(history, week_num=None, hide_complements=
             break
         else:
             print("Invalid option. Please try again.")
+

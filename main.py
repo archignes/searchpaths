@@ -35,6 +35,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Load the mock history for interactive demo.",
     )
+    parser.add_argument(
+        "-z",
+        "--fzf",
+        action="store_true",
+        help="Use fzf to search for and select a search query from your history.",
+    )
     args = parser.parse_args()
 
     if args.browser:
@@ -51,6 +57,8 @@ if __name__ == "__main__":
                 show.dive_into_search_context(search_entry)
             else:
                 print(f"No entries found for {args.date}")
+        elif args.fzf:
+            show.fzf_search_queries(history)
         else:
             show.interact_with_user_for_search_data(history)
     elif args.test:

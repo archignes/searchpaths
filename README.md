@@ -16,8 +16,6 @@ This is very much a work in progress. Status: beta
 
 ## Limitations
 
-## Limitations
-
 1. **Configuration Required**: The path to the Chromium history database must be manually set in the `config.py` file for the tool to function properly.
 
 2. **Limited History**: Chromium browsers typically only retain the last 3 months of browsing history. Searches performed beyond this period will not be included in the analysis.
@@ -34,6 +32,12 @@ This is very much a work in progress. Status: beta
 
 8. **Issue Investigation**: To investigate specific issues or anomalies in the search data, users can load the details of a query and view it in the context of the surrounding searches (following the interactive menu). 
 
+## Query Labels
+
+- **not-url-based**: no query available via query parameters in the URL.
+- **chat-based-search-complement**: a search associated with a chat-based search system (configured in `config.py`)
+- **duplicate**: a search query that is a duplicate of a previous search query but appears as unique history items logged within 1-second.
+- **redirect**: a search is associated with a redirect of some sort, a type of duplicate where the URL is distinct but the system is the same and logged within 1-second of each other. In this case the second URL is shown as the search, the first is labeled as a redirect.
 
 ## Installation
 
@@ -64,13 +68,26 @@ python main.py -b <browser_name>
 
 Replace `<browser_name>` with the name of your Chromium-based browser (e.g., `Chrome`, `Brave`).
 
-You can run with a toy dataset with `python main.py -t`
 
 The script will retrieve your search history and present an interactive menu where you can:
 - View search engine usage percentages for the current week
 - Investigate specific search queries and their surrounding context
 - Jump to previous or next weeks
 - Export search data to CSV or TXT formats
+
+### Additional command line options
+
+- run with a toy dataset with `python main.py -t`
+- load a random query from your history with `python main.py -b {browser name} -r`
+   - will show the query within the context of other history items (`dive_into_search_context`)
+- reload context of a query via the datetime
+   - `python main.py -b {browser name} -d "{datetime}"`
+   - datetime must be in YYYY-MM-DD HH:MM:SS format, in quotes
+   - uses `dive_into_search_context`
+- fuzzy search for a query string (and then an instance of it if multiple)
+   - `python main.py -b {browser name} -f`
+   - lets you fuzzily search for a query and then show the context of that query (`dive_into_search_context`)
+
 
 ## Configuration
 

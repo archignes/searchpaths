@@ -6,13 +6,12 @@ HISTORY_DATABASE_PATHS = {
 
 SKIP_DOMAINS = [
     "http://localhost",
-    "https://searchjunct.com",
     "https://instantdomains.com",
-    "https://danielsgriffin.com",
     "*.vercel.app"
 ]
 
 SITE_SEARCH_DOMAINS = [
+    "https://searchjunct.com",
     "https://instantdomains.com",
     "https://danielsgriffin.com",
     "https://twitter.com",

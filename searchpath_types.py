@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 
-class HistoryEntry(TypedDict):
+class HistoryItem(TypedDict):
     url: str
     title: str
     visit_count: int
@@ -13,7 +13,7 @@ class HistoryEntry(TypedDict):
 class HistoryByWeek(TypedDict):
     # This is the output from extract.get_history_by_week
     week_num: int
-    history: List[HistoryEntry]
+    history: List[HistoryItem]
     start_date: str
     end_date: str
 

@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 import pytz
 
 from config import SITE_SEARCH_DOMAINS, SKIP_DOMAINS, LOGGABLE_SEARCH_SYSTEMS, CHAT_BASED_SEARCH_COMPLEMENTS
-from searchpath_types import HistoryByWeek, HistoryByWeekAnalyzed, HistoryEntry
+from searchpath_types import HistoryByWeek, HistoryByWeekAnalyzed, HistoryItem
 
 
 
@@ -130,8 +130,6 @@ def update_temp_history(temp_history, url, title, visit_count, last_visit_time):
 def add_search_data_to_history(history):
     temp_history = []
     for entry in history:
-        if "search_query" in entry:
-            continue
         url = entry["url"]
         parsed_url = urlparse(url)
         query = parse_qs(parsed_url.query)
@@ -144,17 +142,23 @@ def add_search_data_to_history(history):
         elif is_loggable_search_system(url):
             for site in CHAT_BASED_SEARCH_COMPLEMENTS:
                 if url.startswith(site):
-                    entry["search_query"] = "**chat-based-search-complement**"
+                    entry["search_label"] = "chat-based-search-complement"
+                    entry.pop("search_query", None)
                     break
             else:
-                entry["search_query"] = "**not-url-based**"
+                entry["search_label"] = "not-url-based"
+                entry.pop("search_query", None)
         else:
-            entry["search_query"] = None
+            entry.pop("search_query", None)
+        
+        if any(url.startswith(site) for site in SITE_SEARCH_DOMAINS):
+            entry["search_label"] = "site_search"
+        if not cleanup(url, temp_history):
+            entry["search_label"] = "redirect"
+
         if "search_query" in entry and entry["search_query"]:
             entry["search_engine"] = parsed_url.netloc.replace("www.", "")
-        if not cleanup(url, temp_history):
-            entry["search_query"] = "**duplicate**"
-        if entry["search_query"] != None and entry["search_query"] != "**duplicate**":
+        if "search_query" in entry:
             temp_history = update_temp_history(temp_history, url, entry["title"], entry["visit_count"], entry["last_visit_time"])
         
     return history
@@ -200,9 +204,6 @@ def is_likely_countable_search_url(temp_history, url, visit_count):
             if skip_domain.startswith("*"):
                 if skip_domain.replace("*", "") in url:
                     return False
-        for site in SITE_SEARCH_DOMAINS:
-            if url.startswith(site):
-                return False
         for key, cleanup in SITE_SPECIFIC_SEARCH_CLEANUP.items():
             if url.startswith(key):
                 return cleanup(url, temp_history)
@@ -312,7 +313,7 @@ def get_chromium_history(data_path):
 
     return history
 
-def get_history_by_week(history: List[HistoryEntry], week_num: int = 0, start_on_monday: bool = True) -> HistoryByWeek:
+def get_history_by_week(history: List[HistoryItem], week_num: int = 0, start_on_monday: bool = True) -> HistoryByWeek:
     current_date = datetime.now()
 
     
@@ -345,7 +346,7 @@ def get_history_by_week(history: List[HistoryEntry], week_num: int = 0, start_on
 
 
 def get_search_engine_percentages(
-    history: List[HistoryEntry],
+    history: List[HistoryItem],
     week_num: int = 0,
     start_on_monday: bool = True,
     all: bool = False,
@@ -372,9 +373,9 @@ def get_search_engine_percentages(
     search_query_history = []
     for entry in scoped_history["history"]:
         if "search_query" in entry and entry["search_query"]:
-            if entry["search_query"] in ["**duplicate**", "**redirect**"]:
+            if entry.get("search_label", None) in ["duplicate", "redirect", "site_search"]:
                 continue
-            if hide_complements and entry["search_query"] == "**chat-based-search-complement**":
+            if hide_complements and entry.get("search_label", None) == "chat-based-search-complement":
                 continue
             parsed_url = urlparse(entry["url"])
             search_engine = parsed_url.netloc
@@ -414,8 +415,12 @@ def get_search_entry_by_datetime(history: List[Dict[str, Any]], datetime_str: st
         if entry_datetime == target_datetime:
             return entry
     return None
+
 def get_random_search_url(history: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    search_history = [entry for entry in history if entry.get("search_query")]
-    from pprint import pprint
-    pprint(search_history[0])
+    search_history = [
+        entry for entry in history if entry.get("search_query") and 
+        entry.get("search_label", None) not in ["redirect", "duplicate", 
+                                      "chat-based-search-complement", 
+                                      "not-url-based"]
+    ]
     return random.choice(search_history) if search_history else None
