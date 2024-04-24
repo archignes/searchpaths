@@ -41,6 +41,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Use fzf to search for and select a search query from your history.",
     )
+    
     args = parser.parse_args()
 
     if args.browser:

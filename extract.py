@@ -143,11 +143,11 @@ def add_search_data_to_history(history):
             for site in CHAT_BASED_SEARCH_COMPLEMENTS:
                 if url.startswith(site):
                     entry["search_label"] = "chat-based-search-complement"
-                    entry.pop("search_query", None)
+                    entry["search_query"] = "..."
                     break
             else:
                 entry["search_label"] = "not-url-based"
-                entry.pop("search_query", None)
+                entry["search_query"] = "..."
         else:
             entry.pop("search_query", None)
         

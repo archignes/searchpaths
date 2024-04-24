@@ -363,7 +363,7 @@ def interact_with_user_for_search_data(history, week_num=None, hide_complements=
             'P': f"for the Previous week ({current_week_num + 1})",
             'N': f"for the Next week ({current_week_num - 1})",
             'S': "to jump to a Specific week",
-            'C': f"to {'exclude' if hide_complements else 'include'} hat-based search Complements",
+            'C': f"to {'exclude' if hide_complements else 'include'} chat-based search Complements",
             'I': "to Investigate this week",
             'E': "to Export",
             'Q': "to Quit"
