@@ -24,13 +24,13 @@ This is very much a work in progress. Status: beta
 
 3. **Desktop Searches Only**: Currently, Searchpaths only analyzes searches conducted on desktop browsers. Mobile browser searches are not included unless they are synced with the desktop history.
 
-4. **App-Based Searches**: Searches performed within mobile apps or other non-browser applications are not captured by SearchPaths.
+4. **App-Based Searches**: Searches performed within mobile apps or other non-browser applications are not captured by Searchpaths.
 
-5. **Non-URL-Based Searches**: SearchPaths counts searches that are not explicitly indicated by query parameters in the URL. These searches are labeled as "**not-url-based**" in the output.
+5. **Non-URL-Based Searches**: Searchpaths counts searches that are not explicitly indicated by query parameters in the URL. These searches are labeled as "**not-url-based**" in the output.
 
 6. **Configurable Complements**: Certain search systems, referred to as "Complements" and configured in `config.py`, are optionally included in the analysis. To include them, press 'c' at the main menu. Queries for these systems are marked as "**chat-based-search-complement**" in the output.
 
-7. **URL Pattern Handling**: SearchPaths employs various techniques to handle unusual URL patterns and redirects. However, some edge cases may not be perfectly addressed, potentially leading to inconsistencies and gaps in the data and subsequent analysis.
+7. **URL Pattern Handling**: Searchpaths employs various techniques to handle unusual URL patterns and redirects. However, some edge cases may not be perfectly addressed, potentially leading to inconsistencies and gaps in the data and subsequent analysis.
 
 8. **Issue Investigation**: To investigate specific issues or anomalies in the search data, users can load the details of a query and view it in the context of the surrounding searches (following the interactive menu). 
 
@@ -56,7 +56,7 @@ This is very much a work in progress. Status: beta
 
 ## Usage
 
-To run SearchPaths, use the following command:
+To run Searchpaths, use the following command:
 
 ```
 python main.py -b <browser_name>
@@ -84,7 +84,7 @@ The `config.py` file contains various configuration options:
 
 ## Testing
 
-SearchPaths includes a minimal testing suite to ensure the correctness of basic functionality. 
+Searchpaths includes a minimal testing suite to ensure the correctness of basic functionality. 
 
 To run the tests, use the following command:
 
