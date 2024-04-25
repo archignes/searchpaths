@@ -16,6 +16,7 @@ class HistoryByWeek(TypedDict):
     history: List[HistoryItem]
     start_date: str
     end_date: str
+    total_weeks_logged: int
 
 
 class HistoryByWeekAnalyzed(TypedDict):

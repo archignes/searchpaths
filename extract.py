@@ -1,6 +1,7 @@
 import json
 import glob
 import os
+import csv
 import random
 import shutil
 import sqlite3
@@ -13,8 +14,7 @@ import pytz
 
 from config import SITE_SEARCH_DOMAINS, SKIP_DOMAINS, LOGGABLE_SEARCH_SYSTEMS, CHAT_BASED_SEARCH_COMPLEMENTS
 from searchpath_types import HistoryByWeek, HistoryByWeekAnalyzed, HistoryItem
-
-
+from extract_htu import get_htu_history
 
 
 def convert_chrome_time(chrome_time: str) -> datetime:
@@ -113,6 +113,7 @@ def update_temp_history(temp_history, url, title, visit_count, last_visit_time):
             time_diff = get_time_diff(visit_time, temp_history[-1]["last_visit_time_raw"])
             if time_diff.total_seconds() <= 1:
                 temp_history[-1]["search_query"] = "**redirect**"
+    
     # Add the entry to temp_history with raw last_visit_time for comparison
     temp_history.append(
         {
@@ -160,7 +161,8 @@ def add_search_data_to_history(history):
             entry["search_engine"] = parsed_url.netloc.replace("www.", "")
         if "search_query" in entry:
             temp_history = update_temp_history(temp_history, url, entry["title"], entry["visit_count"], entry["last_visit_time"])
-        
+        if url == "https://www.perplexity.ai/search":
+            entry["search_label"] = "landing_page"
     return history
 
 def is_likely_countable_search_url(temp_history, url, visit_count):
@@ -264,9 +266,29 @@ def is_guid_version_of_query(url, url_to_check_against):
         return hyphenated_url_query.startswith(url_string_to_check_against)
 
 
+def get_tsv_history(data_path: str) -> List[HistoryItem]:
+    """
+    Extracts history from a TSV file.
+    ex. the export from the History Trends Unlimited extension.
+    """
+    with open(data_path, "r") as f:
+        data_reader = csv.reader(f, delimiter='\t')
+        data = [row for row in data_reader]
+    
+    raw_history = []
+    for entry in data:
+        url, host, domain, visit_time, visit_time_string, day_of_visit, transition, title = entry
+        # see chrome-extension://pnmchffiealhkdloeffcdnbgdnedheme/export_details.html
+        raw_history.append({
+            "url": url,
+            "title": title,
+            "visit_count": 1,
+            "last_visit_time": visit_time_string,
+        })
+    
+    return raw_history
 
-def get_chromium_history(data_path):
-
+def get_chromium_history(data_path: str) -> List[HistoryItem]:
     if not os.path.exists(data_path):
         raise FileNotFoundError(
             f"The specified path does not exist: {data_path}")
@@ -286,32 +308,136 @@ def get_chromium_history(data_path):
     cursor.execute(query)
 
     # Fetch all results
-    results = cursor.fetchall()
+    data = cursor.fetchall()
 
     # Close the connection to the database
     cursor.close()
     c.close()
 
-    # Create a list to hold the history
-    history = []
+    raw_history = []
+    for entry in data:
+        url, title, visit_count, last_visit_time = entry
+        raw_history.append({
+            "url": url,
+            "title": title,
+            "visit_count": int(visit_count),
+            "last_visit_time": last_visit_time,
+        })
 
+    return raw_history
+
+def get_history(data_path: str) -> List[HistoryItem]:
+    if data_path == "htu":
+        raw_history = get_htu_history()
+    elif data_path.endswith(".tsv"):
+        raw_history = get_tsv_history(data_path)
+    else:
+        raw_history = get_chromium_history(data_path)
+    
     # Loop through the results and format them
     temp_history = []
-    for url, title, visit_count, last_visit_time in results:
+
+    for entry in raw_history:
+        url = entry["url"]
+        title = entry["title"]
+        visit_count = entry["visit_count"]
+        last_visit_time = entry["last_visit_time"]
+        assert isinstance(url, str)
+        try:
+            assert isinstance(title, str)
+        except:
+            print(entry)
+        assert isinstance(visit_count, int)
         if is_likely_countable_search_url(temp_history, url, visit_count):
             temp_history = update_temp_history(temp_history, url, title, visit_count, last_visit_time)
-    # Filter out the raw last_visit_time before appending to the final history list
+    
+    # Filter out the raw last_visit_time
     history = [
         {k: v for k, v in entry.items() if k != "last_visit_time_raw"}
         for entry in temp_history
     ]
 
     history = add_search_data_to_history(history)
-    
-    # Return the formatted history
     save_cache(history)
-
     return history
+
+def get_total_weeks_logged(history, start_on_monday: bool = True):
+    if history:
+        # Convert all last_visit_time to datetime objects
+        for entry in history:
+            if isinstance(entry["last_visit_time"], str):
+                entry["last_visit_time"] = datetime.strptime(
+                    entry["last_visit_time"].split('.')[0], "%Y-%m-%d %H:%M:%S"
+                )
+            if isinstance(entry["last_visit_time"], int):
+                # Convert Chrometime to datetime
+                entry["last_visit_time"] = datetime(1601, 1, 1) + timedelta(microseconds=entry["last_visit_time"])
+        
+        # Sort history by last_visit_time
+        history.sort(key=lambda x: x["last_visit_time"])
+        
+        # Get the most recent date
+        most_recent_date = history[-1]["last_visit_time"]
+        
+        # Determine the weekday of the most recent date
+        most_recent_weekday = most_recent_date.weekday()
+        
+        # Adjust the start day of the week based on user preference
+        if start_on_monday:
+            start_day_adjustment = (most_recent_weekday + 7) % 7
+        else:  # If start_on_monday is False, the week starts on Sunday
+            start_day_adjustment = (most_recent_weekday + 1) % 7
+        
+        # Calculate the start of the current week
+        current_week_start = most_recent_date - timedelta(days=start_day_adjustment)
+        
+        
+        def convert_datetime_to_int(dt: datetime) -> int:
+            return int(dt.strftime('%s'))
+    
+        # Filter out entries with invalid last_visit_time
+        history = [entry for entry in history if convert_datetime_to_int(entry["last_visit_time"]) >= 1]
+        
+        # Get the first date in the filtered history
+        first_date = history[0]["last_visit_time"] if history else None
+        
+        # Calculate the difference in weeks
+        weeks_logged = (current_week_start - first_date).days // 7
+        
+        # Include the current week
+        weeks_logged += 1
+        weeks_logged += 1
+        
+    return weeks_logged
+
+def get_history_by_month(history: List[HistoryItem], month_num: int = 0) -> HistoryByWeek:
+    current_date = datetime.now()
+    
+    # Calculate the target year and month considering month_num
+    target_year = current_date.year - (month_num // 12)
+    target_month = current_date.month - (month_num % 12)
+    
+    # Adjust for when target_month becomes 0 or negative
+    if target_month <= 0:
+        target_month += 12
+        target_year -= 1
+
+    start_date = datetime(target_year, target_month, 1).date()
+    end_date = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    
+    filtered_history = [
+        entry
+        for entry in history
+        if start_date <= (entry["last_visit_time"].date() if isinstance(entry["last_visit_time"], datetime) else datetime.strptime(entry["last_visit_time"], "%Y-%m-%d %H:%M:%S").date()) <= end_date
+    ]
+
+    month_search_data: HistoryByWeek = {
+        "month_num": month_num,
+        "start_date": start_date,
+        "end_date": end_date,
+        "history": filtered_history,
+    }
+    return month_search_data
 
 def get_history_by_week(history: List[HistoryItem], week_num: int = 0, start_on_monday: bool = True) -> HistoryByWeek:
     current_date = datetime.now()
@@ -332,10 +458,9 @@ def get_history_by_week(history: List[HistoryItem], week_num: int = 0, start_on_
     filtered_history = [
         entry
         for entry in history
-        if start_date
-        <= datetime.strptime(entry["last_visit_time"], "%Y-%m-%d %H:%M:%S").date()
-        <= end_date
+        if start_date <= (entry["last_visit_time"].date() if isinstance(entry["last_visit_time"], datetime) else datetime.strptime(entry["last_visit_time"], "%Y-%m-%d %H:%M:%S").date()) <= end_date
     ]
+
     week_search_data: HistoryByWeek = {
         "week_num": week_num,
         "start_date": start_date,
@@ -349,7 +474,9 @@ def get_search_engine_percentages(
     history: List[HistoryItem],
     week_num: int = 0,
     start_on_monday: bool = True,
-    all: bool = False,
+    full_history: bool = False,
+    by_month: bool = False,
+    month_num: int = 0,
     hide_complements: bool = True
 ) -> Dict[str, Any]:
     """
@@ -361,19 +488,21 @@ def get_search_engine_percentages(
     :param start_on_monday: Whether the week starts on Monday or not.
     :return: A dictionary containing the search engine data and the start and end dates for the week.
     """
-    if all:
+    if full_history:
         scoped_history = {
             "history": history,
             "start_date": history[0]["last_visit_time"],
             "end_date": history[-1]["last_visit_time"],
         }
+    elif by_month:
+        scoped_history = get_history_by_month(history, month_num)
     else:
         scoped_history = get_history_by_week(history, week_num, start_on_monday)
     search_engines = Counter()
     search_query_history = []
     for entry in scoped_history["history"]:
         if "search_query" in entry and entry["search_query"]:
-            if entry.get("search_label", None) in ["duplicate", "redirect", "site_search"]:
+            if entry.get("search_label", None) in ["duplicate", "redirect", "site_search", "landing_page"]:
                 continue
             if hide_complements and entry.get("search_label", None) == "chat-based-search-complement":
                 continue
@@ -401,11 +530,13 @@ def get_search_engine_percentages(
     
     # Return the search engine data and the start and end dates for the week
     return {
+        "label": "month" if by_month else f"week",
         "start_date": scoped_history["start_date"],
         "end_date": scoped_history["end_date"],
         "total_searches": total_searches,
         "search_query_history": search_query_history,
         "search_engines": sorted_search_engines,
+        "total_weeks_logged": get_total_weeks_logged(history, start_on_monday)
     }
 
 def get_search_entry_by_datetime(history: List[Dict[str, Any]], datetime_str: str) -> Optional[Dict[str, Any]]:

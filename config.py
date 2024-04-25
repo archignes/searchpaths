@@ -1,8 +1,23 @@
 
+# You can find your profile path by opening Chrome or Brave and going to 
+# chrome://version/ or brave://version/
+# Then look for the "Profile Path" heading.
+#
+# Credit: Randy Lauen (maker of History Trends Unlimited (HTU)) points this out at
+# https://sites.google.com/view/history-trends-unlimited/faq#h.p_rBVxOKWmdGsJ
+
+# Examples here are for Chrome, Brave, and the export from the HTU extension.
 HISTORY_DATABASE_PATHS = {
     "Chrome": "/Users/dsg/Library/Application Support/Google/Chrome/Default",
-    "Brave": "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6"
+    "Brave": "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6",
+    "HTU": "external_data/htu_analyze_20240424_115537.tsv"
 }
+
+# This can be used to access the HTU history database without manual export.
+# It will be synced as of the last time the extension was used OR the browser was restarted.
+HTU_PROFILE_PATH = "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6"
+
+# Filtering and Processing Configurations
 
 SKIP_DOMAINS = [
     "http://localhost",
@@ -15,7 +30,8 @@ SITE_SEARCH_DOMAINS = [
     "https://instantdomains.com",
     "https://danielsgriffin.com",
     "https://twitter.com",
-    "https://www.tiktok.com"
+    "https://www.tiktok.com",
+    "https://github.com"
 ]
 
 # These are search systems that may not always (or ever) have query strings indicated in search pages.

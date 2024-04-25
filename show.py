@@ -55,7 +55,7 @@ def print_history_items(records, url=None):
     print(divider)
 
 
-def print_search_engine_percentages(data, min_percentage=None, top_n=10):
+def print_search_engine_percentages(data, min_percentage=None, top_n=10, by_month=False, full_history=False):
     """
     Prints the formatted search engine percentages and other relevant data.
 
@@ -63,20 +63,24 @@ def print_search_engine_percentages(data, min_percentage=None, top_n=10):
     :param min_percentage: Minimum percentage to display a search engine.
     :param top_n: Number of top search engines to display.
     """
-    start_date = data["start_date"]
+    start_date = data["start_date"].date() if isinstance(data["start_date"], datetime) else data["start_date"]
     current_date = datetime.now().date()
     week_difference = ((current_date - start_date).days // 7)
 
-    if week_difference == 0:
-        week_label = "This week"
+    if by_month:
+        label = f"{start_date.strftime('%B')} {start_date.strftime('%Y')}"
+    elif full_history:
+        label = "Full history view"
+    elif week_difference == 0:
+        label = "This week"
     elif week_difference == 1:
-        week_label = "Last week"
+        label = "Last week"
     else:
-        week_label = f"{week_difference} weeks ago"
+        label = f"{week_difference} weeks ago"
 
-    week_label += f"\n{data['start_date'].strftime('%A')} {data['start_date'].strftime('%Y-%m-%d')} to {data['end_date'].strftime('%Y-%m-%d')}"
+    label += f"\n{data['start_date'].strftime('%A')} {data['start_date'].strftime('%Y-%m-%d')} to {data['end_date'].strftime('%Y-%m-%d')}"
 
-    cprint(week_label, "cyan")
+    cprint(label, "cyan")
     cprint(f"Total desktop searches: {data['total_searches']}", "green")
 
     print("|-----------------------------------------|")
@@ -112,60 +116,76 @@ def print_search_engine_percentages(data, min_percentage=None, top_n=10):
     return data
 
 
-def investigate_week(week_data):
+def investigate_week(timespan_data):
     """
     Initiates the investigation process for a specific week's search data.
 
     Parameters:
-    - week_data: A dictionary containing data for a specific week, including
+    - timespan_data: A dictionary containing data for a specific week, including
       search engines and their search counts.
     """
-    print_week_summary(week_data)
+    print_week_summary(timespan_data)
     user_input = input("Type 'all' to list all or just press enter to explore by "
                        "search system: ").strip().lower()
     if user_input == "all":
-        list_all_investigation(week_data)
+        list_all_investigation(timespan_data)
     else:
-        particular_investigation(week_data)
+        particular_investigation(timespan_data)
 
 
-def print_week_summary(week_data):
+def print_week_summary(timespan_data):
     """
     Prints a summary of the week's search data.
 
     Parameters:
-    - week_data: A dictionary containing data for a specific week.
+    - timespan_data: A dictionary containing data for a specific week.
     """
-    total_searches = sum(count for _, count in week_data["search_engines"])
-    total_engines = len(week_data["search_engines"])
+    total_searches = sum(count for _, count in timespan_data["search_engines"])
+    total_engines = len(timespan_data["search_engines"])
     print(f"\nDuring this week, there were a total of {total_searches} searches "
           f"across {total_engines} search engines.\n")
 
 
-def list_all_investigation(week_data=None, full_history=False):
+def list_all_investigation(timespan_data=None, full_history=False):
     """
     Lists all searches in a formatted table, sorted in reverse chronological order.
     """
     if full_history:
         sorted_searches = [item for item in load_cache() if "search_engine" in item]
+        data = {
+            "search_query_history": sorted_searches,
+            "start_date": sorted_searches[0]["last_visit_time"] if sorted_searches else datetime.now(),
+            "end_date": sorted_searches[-1]["last_visit_time"] if sorted_searches else datetime.now()
+        }
     else:    
         sorted_searches = sorted(
-            week_data["search_query_history"],
+            timespan_data["search_query_history"],
             key=lambda x: x['last_visit_time'],
             reverse=True
         )
-        
+        data = {
+            "search_query_history": sorted_searches,
+            "start_date": timespan_data["start_date"],
+            "end_date": timespan_data.get("end_date", datetime.now().date())
+        }
     
+    # normalize search engine names
+    sorted_searches = [
+        {**item, "search_engine": item["search_engine"].replace("www.", "")}
+        for item in sorted_searches
+    ]
     print_history_items(sorted_searches)
-    investigation_user_interaction(sorted_searches)
+    investigation_user_interaction(data)
 
 def add_search_engine_data(data):
-    history = data
-    search_engine_data = set([item["search_engine"] for item in data])
-    data = {}
-    data["search_engines"] = {search_engine: 0 for search_engine in list(search_engine_data)}
-    data["search_query_history"] = history
-    return data
+    search_engine_data = set([item["search_engine"].replace("www.", "") for item in data["search_query_history"]])
+    updated_data = {}
+    updated_data["search_engines"] = {search_engine: 0 for search_engine in list(search_engine_data)}
+    print(updated_data["search_engines"])
+    updated_data["search_query_history"] = data["search_query_history"]
+    updated_data["start_date"] = data["search_query_history"][0]["last_visit_time"]
+    updated_data["end_date"] = data["search_query_history"][-1]["last_visit_time"]
+    return updated_data
 
 def particular_investigation(data):
     """
@@ -177,16 +197,28 @@ def particular_investigation(data):
     if "search_engines" not in data:
         data = add_search_engine_data(data)
     fzf = FzfPrompt()
-    search_engine_list = [engine for engine, _ in data["search_engines"]]
+    search_engine_list = [engine for engine in data["search_engines"].keys()]
     selected_engine = fzf.prompt(
         search_engine_list, "--prompt='Select a search engine: '")[0]
     # Calculate the time range from the start date to the end date or current date
     start_date = data["start_date"]
     end_date = data.get("end_date", datetime.now().date())
-    start_week = start_date.isocalendar()[1]
-    start_year = start_date.isocalendar()[0]
-    end_week = end_date.isocalendar()[1]
-    end_year = end_date.isocalendar()[0]
+    try:
+        start_week = start_date.isocalendar()[1]
+        start_year = start_date.isocalendar()[0]
+    except AttributeError:
+        # If the date is not a valid datetime object, convert it to a datetime object
+        start_date = datetime.strptime(start_date.split(' ')[0], '%Y-%m-%d').date()
+        start_week = start_date.isocalendar()[1]
+        start_year = start_date.isocalendar()[0]
+    try:
+        end_week = end_date.isocalendar()[1]
+        end_year = end_date.isocalendar()[0]
+    except AttributeError:
+        # If the date is not a valid datetime object, convert it to a datetime object
+        end_date = datetime.strptime(end_date.split(' ')[0], '%Y-%m-%d').date()
+        end_week = end_date.isocalendar()[1]
+        end_year = end_date.isocalendar()[0]
     week_difference_start = (start_year - end_year) * 52 + (start_week - end_week)
     week_difference_end = (end_year - start_year) * 52 + (end_week - start_week)
 
@@ -322,6 +354,8 @@ def fzf_search_queries(history: List[HistoryItem]):
             
             dive_into_search_context(selected_entry)
 
+
+
 def interact_with_user_for_search_data(history, week_num=None, hide_complements=True):
 
     """
@@ -333,48 +367,48 @@ def interact_with_user_for_search_data(history, week_num=None, hide_complements=
     # Determine the total number of searches logged
     total_searches_logged = len([item for item in history if "search_query" in item and item["search_query"] is not None])
     # Determine the total number of weeks logged
-    total_weeks_logged = set()
-    for entry in history:
-        if isinstance(entry["last_visit_time"], int):
-            # Convert Chrometime to datetime
-            dt = datetime(1601, 1, 1) + timedelta(microseconds=entry["last_visit_time"])
-            entry["last_visit_time"] = dt.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            # Parse the datetime string
-            dt = datetime.strptime(entry["last_visit_time"].split('.')[0], "%Y-%m-%d %H:%M:%S")
-        total_weeks_logged.add(week_num)
-    total_weeks_logged = len(total_weeks_logged)
+    
     if week_num is None:
-        current_week_num = 0
+        current_timespan_num = 0
     else:
-        current_week_num = week_num
-    week_data = get_search_engine_percentages(history, week_num=current_week_num, hide_complements=hide_complements)
-    print_search_engine_percentages(week_data)
+        current_timespan_num = week_num
+    timespan_data = get_search_engine_percentages(history, week_num=current_timespan_num, hide_complements=hide_complements)
+    print_search_engine_percentages(timespan_data)
     print(
-        f"\nTotal weeks logged: {total_weeks_logged}. Currently showing this week.")
+        f"\nTotal weeks logged: {timespan_data['total_weeks_logged']}. Currently showing this week.")
 
 
     context = None
+    
     while True:
         menu_options = {
-            'V': "show the current week's percentages",
+            'V': f"show the current {timespan_data['label']}'s percentages",
             'A': f"for a list of All {total_searches_logged} searches",
-            'W': f"for a list of the {week_data['total_searches']} search{'es' if week_data['total_searches'] != 1 else ''} for the Week",
-            'P': f"for the Previous week ({current_week_num + 1})",
-            'N': f"for the Next week ({current_week_num - 1})",
-            'S': "to jump to a Specific week",
+            'L': f"for a List of the {timespan_data['total_searches']} search{'es' if timespan_data['total_searches'] != 1 else ''} for the {timespan_data['label']}",
+            'M': f"to toggle the Month view",
+            'W': f"to toggle the Week view",
+            'F': f"to toggle the Full data view",
+            'P': f"for the Previous {timespan_data['label']} ({current_timespan_num + 1})",
+            'N': f"for the Next {timespan_data['label']} ({current_timespan_num - 1})",
+            'S': f"to jump to a Specific {timespan_data['label']}",
             'C': f"to {'exclude' if hide_complements else 'include'} chat-based search Complements",
-            'I': "to Investigate this week",
-            'E': "to Export",
+            'I': f"to Investigate the {timespan_data['label']}",
+            'E': f"to Export the {timespan_data['label']}",
             'Q': "to Quit"
         }
         if context is None:
             del menu_options['V']
         if context == "list_all":
             del menu_options['A']
-        if current_week_num == 0:
+        if context == "month_view":
+            del menu_options['W']
+        if context == "full_view":
+            del menu_options['F']
+        if context == "week_view":
+            del menu_options['M']
+        if current_timespan_num == 0:
             del menu_options['N']  # Remove option for previous week
-        elif current_week_num == total_weeks_logged:
+        elif current_timespan_num == timespan_data['total_weeks_logged']:
             print("This is the last week. No previous week.")
             del menu_options['P']  # Remove option for next week
 
@@ -385,42 +419,70 @@ def interact_with_user_for_search_data(history, week_num=None, hide_complements=
 
         user_choice = input(menu_string+"\n").lower()
         if user_choice == 'n':
-            current_week_num -= 1
-            week_data = get_search_engine_percentages(
-                history, week_num=current_week_num)
-            print_search_engine_percentages(week_data)
-            context = "next_week"
+            if current_timespan_num == 0:
+                print("This is the first week. No previous week.")
+                continue
+            current_timespan_num -= 1
+            if context == "month_view":
+                timespan_data = get_search_engine_percentages(
+                history, month_num=current_timespan_num, by_month=True)
+            else:
+                timespan_data = get_search_engine_percentages(
+                history, week_num=current_timespan_num)            
+            print_search_engine_percentages(timespan_data)
+        elif user_choice == 'f':
+            context = "full_view"
+            timespan_data = get_search_engine_percentages(
+                history, full_history=True)
+            print_search_engine_percentages(timespan_data, full_history=True)
         elif user_choice == 'a':
             list_all_investigation(full_history=True)
             context = "list_all"
-        elif user_choice == 'v':
-            return interact_with_user_for_search_data(history, week_num=current_week_num, hide_complements=hide_complements)
-        elif user_choice == 'c':
-            return interact_with_user_for_search_data(history, week_num=current_week_num, hide_complements=not hide_complements)
+        elif user_choice == 'm':
+            # convert current_timespan_num to a month
+            # Adjust current_timespan_num to month number using modulo division
+            current_timespan_num = (current_timespan_num - 1) // 4 + 1
+            timespan_data = get_search_engine_percentages(
+                history, by_month=True, month_num=current_timespan_num)
+            print_search_engine_percentages(timespan_data, by_month=True)
+            context = "month_view"
         elif user_choice == 'w':
-            list_all_investigation(week_data)
-            context = "list_week"
+            timespan_data = get_search_engine_percentages(
+                history, week_num=current_timespan_num)
+            print_search_engine_percentages(timespan_data)
+            context = "week_view"
+        elif user_choice == 'v':
+            return interact_with_user_for_search_data(history, week_num=current_timespan_num, hide_complements=hide_complements)
+        elif user_choice == 'c':
+            return interact_with_user_for_search_data(history, week_num=current_timespan_num, hide_complements=not hide_complements)
+        elif user_choice == 'l':
+            list_all_investigation(timespan_data)
+            context = "list"
         elif user_choice == 'p':
-            current_week_num += 1
-            week_data = get_search_engine_percentages(
-                history, week_num=current_week_num)
-            print_search_engine_percentages(week_data)
-            context = "previous_week"
+            current_timespan_num += 1
+            if context == "month_view":
+                timespan_data = get_search_engine_percentages(
+                history, month_num=current_timespan_num, by_month=True)
+                print_search_engine_percentages(timespan_data, by_month=True)
+            else:
+                timespan_data = get_search_engine_percentages(
+                history, week_num=current_timespan_num)            
+                print_search_engine_percentages(timespan_data)
         elif user_choice == 's':
             week_num = int(input("Enter the number of weeks back to view: "))
-            current_week_num = week_num
-            week_data = get_search_engine_percentages(
+            current_timespan_num = week_num
+            timespan_data = get_search_engine_percentages(
                 history, week_num=week_num)
-            print_search_engine_percentages(week_data)
+            print_search_engine_percentages(timespan_data)
             context = "specific_week"
         elif user_choice == 'i':
-            investigate_week(week_data)
+            investigate_week(timespan_data)
             context = "investigate_week"
         elif user_choice == 'e':
             data_scope = input(
                 "Export data for:\n1: This week\n2: All history\n: ").strip()
             if data_scope == "1":
-                export_searches(week_data)
+                export_searches(timespan_data)
             elif data_scope == "2":
                 export_searches(history)
             elif user_choice == 'q':

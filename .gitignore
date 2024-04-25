@@ -3,6 +3,7 @@
 exports/
 venv/
 cached_histories/
+external_data/
 
 
 

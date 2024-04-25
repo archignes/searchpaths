@@ -18,6 +18,12 @@ if __name__ == "__main__":
         help="Choose the browser's history to process.",
     )
     parser.add_argument(
+        "-htu",
+        "--htu",
+        action="store_true",
+        help="Load history from the HTU database.",
+    )
+    parser.add_argument(
         "-r",
         "--random",
         action="store_true",
@@ -44,11 +50,15 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    if args.browser:
-        browser_choice = args.browser
-        data_path = os.path.expanduser(config.HISTORY_DATABASE_PATHS[browser_choice])
+    if args.browser or args.htu:
+        if args.browser:
+            browser_choice = args.browser
+            data_path = os.path.expanduser(config.HISTORY_DATABASE_PATHS[browser_choice])
+        if args.htu:
+            browser_choice = "HTU sync"
+            data_path = "htu"
         print(f"Processing history from {browser_choice} database...")
-        history = extract.get_chromium_history(data_path)
+        history = extract.get_history(data_path)
         if args.random:
             random_url = extract.get_random_search_url(history)
             show.dive_into_search_context(random_url)
