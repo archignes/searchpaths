@@ -3,6 +3,8 @@ import os
 from datetime import datetime
 from termcolor import cprint
 
+from pyfzf import FzfPrompt
+
 import config
 import extract
 import show
@@ -47,7 +49,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Use fzf to search for and select a search query from your history.",
     )
-    
+
     args = parser.parse_args()
 
     if args.browser or args.htu:
@@ -77,7 +79,27 @@ if __name__ == "__main__":
         extract.save_cache(history)
         show.interact_with_user_for_search_data(history)
     else:
-        print("No browser selected. Exiting...")
+        available_sources = []
+        for browser_choice in config.HISTORY_DATABASE_PATHS:
+            if os.path.exists(config.HISTORY_DATABASE_PATHS[browser_choice]):
+                available_sources.append(browser_choice)
+            else:
+                print(f"The specified path does not exist: {config.HISTORY_DATABASE_PATHS[browser_choice]}")
+        if config.HTU_PROFILE_PATH and os.path.exists(config.HTU_PROFILE_PATH):
+            available_sources.append("HTU sync")
+        if not available_sources:
+            print("No available sources found. Exiting...")
+            exit(1)
+        fzf = FzfPrompt()
+        selected_source = fzf.prompt(available_sources, "--prompt='Select a source: '")[0]
+        if selected_source:
+            print(f"Processing history from {selected_source} database...")
+            if selected_source == "HTU sync":
+                history = extract.get_history("htu")
+            else:
+                data_path = os.path.expanduser(config.HISTORY_DATABASE_PATHS[selected_source])
+                history = extract.get_history(data_path)
+            show.interact_with_user_for_search_data(history)
         exit(1)
 
     # Calculate the length of the history

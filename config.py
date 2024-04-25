@@ -1,5 +1,5 @@
 
-# You can find your profile path by opening Chrome or Brave and going to 
+# You can find your profile path by opening Chrome or Brave and going to
 # chrome://version/ or brave://version/
 # Then look for the "Profile Path" heading.
 #
@@ -10,7 +10,7 @@
 HISTORY_DATABASE_PATHS = {
     "Chrome": "/Users/dsg/Library/Application Support/Google/Chrome/Default",
     "Brave": "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6",
-    "HTU": "external_data/htu_analyze_20240424_115537.tsv"
+    "HTUexport": "external_data/htu_analyze_20240424_133319.tsv"
 }
 
 # This can be used to access the HTU history database without manual export.
@@ -57,4 +57,3 @@ CHAT_BASED_SEARCH_COMPLEMENTS = [
     "https://chat.openai.com/",
     "https://gemini.google.com/app"
 ]
-

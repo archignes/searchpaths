@@ -37,7 +37,7 @@ def perplexity_cleanup(url, temp_history):
         return True
     if url.replace("www.", "") == temp_history[-1]['url'].replace("www.", ""):
         return False
-   
+
     if not any("perplexity.ai" in entry['url'] for entry in temp_history[-3:]):
         if url not in {entry['url'] for entry in temp_history}:
             return True
@@ -87,11 +87,11 @@ def cleanup(url, temp_history):
             return cleanup(url, temp_history)
     else:
         return True
-    
+
 def get_time_diff(current_item_visit_time: datetime, last_item_visit_time: str) -> timedelta:
     if not isinstance(current_item_visit_time, datetime):
         raise TypeError("current_item_visit_time must be a datetime object")
-        
+
     return current_item_visit_time - convert_chrome_time(last_item_visit_time)
 
 def update_temp_history(temp_history, url, title, visit_count, last_visit_time):
@@ -113,7 +113,7 @@ def update_temp_history(temp_history, url, title, visit_count, last_visit_time):
             time_diff = get_time_diff(visit_time, temp_history[-1]["last_visit_time_raw"])
             if time_diff.total_seconds() <= 1:
                 temp_history[-1]["search_query"] = "**redirect**"
-    
+
     # Add the entry to temp_history with raw last_visit_time for comparison
     temp_history.append(
         {
@@ -151,7 +151,7 @@ def add_search_data_to_history(history):
                 entry["search_query"] = "..."
         else:
             entry.pop("search_query", None)
-        
+
         if any(url.startswith(site) for site in SITE_SEARCH_DOMAINS):
             entry["search_label"] = "site_search"
         if not cleanup(url, temp_history):
@@ -274,7 +274,7 @@ def get_tsv_history(data_path: str) -> List[HistoryItem]:
     with open(data_path, "r") as f:
         data_reader = csv.reader(f, delimiter='\t')
         data = [row for row in data_reader]
-    
+
     raw_history = []
     for entry in data:
         url, host, domain, visit_time, visit_time_string, day_of_visit, transition, title = entry
@@ -285,7 +285,7 @@ def get_tsv_history(data_path: str) -> List[HistoryItem]:
             "visit_count": 1,
             "last_visit_time": visit_time_string,
         })
-    
+
     return raw_history
 
 def get_chromium_history(data_path: str) -> List[HistoryItem]:
@@ -333,7 +333,7 @@ def get_history(data_path: str) -> List[HistoryItem]:
         raw_history = get_tsv_history(data_path)
     else:
         raw_history = get_chromium_history(data_path)
-    
+
     # Loop through the results and format them
     temp_history = []
 
@@ -345,12 +345,13 @@ def get_history(data_path: str) -> List[HistoryItem]:
         assert isinstance(url, str)
         try:
             assert isinstance(title, str)
-        except:
+        except Exception as e:
             print(entry)
+            raise e
         assert isinstance(visit_count, int)
         if is_likely_countable_search_url(temp_history, url, visit_count):
             temp_history = update_temp_history(temp_history, url, title, visit_count, last_visit_time)
-    
+
     # Filter out the raw last_visit_time
     history = [
         {k: v for k, v in entry.items() if k != "last_visit_time_raw"}
@@ -372,51 +373,51 @@ def get_total_weeks_logged(history, start_on_monday: bool = True):
             if isinstance(entry["last_visit_time"], int):
                 # Convert Chrometime to datetime
                 entry["last_visit_time"] = datetime(1601, 1, 1) + timedelta(microseconds=entry["last_visit_time"])
-        
+
         # Sort history by last_visit_time
         history.sort(key=lambda x: x["last_visit_time"])
-        
+
         # Get the most recent date
         most_recent_date = history[-1]["last_visit_time"]
-        
+
         # Determine the weekday of the most recent date
         most_recent_weekday = most_recent_date.weekday()
-        
+
         # Adjust the start day of the week based on user preference
         if start_on_monday:
             start_day_adjustment = (most_recent_weekday + 7) % 7
         else:  # If start_on_monday is False, the week starts on Sunday
             start_day_adjustment = (most_recent_weekday + 1) % 7
-        
+
         # Calculate the start of the current week
         current_week_start = most_recent_date - timedelta(days=start_day_adjustment)
-        
-        
+
+
         def convert_datetime_to_int(dt: datetime) -> int:
             return int(dt.strftime('%s'))
-    
+
         # Filter out entries with invalid last_visit_time
         history = [entry for entry in history if convert_datetime_to_int(entry["last_visit_time"]) >= 1]
-        
+
         # Get the first date in the filtered history
         first_date = history[0]["last_visit_time"] if history else None
-        
+
         # Calculate the difference in weeks
         weeks_logged = (current_week_start - first_date).days // 7
-        
+
         # Include the current week
         weeks_logged += 1
         weeks_logged += 1
-        
+
     return weeks_logged
 
 def get_history_by_month(history: List[HistoryItem], month_num: int = 0) -> HistoryByWeek:
     current_date = datetime.now()
-    
+
     # Calculate the target year and month considering month_num
     target_year = current_date.year - (month_num // 12)
     target_month = current_date.month - (month_num % 12)
-    
+
     # Adjust for when target_month becomes 0 or negative
     if target_month <= 0:
         target_month += 12
@@ -424,7 +425,7 @@ def get_history_by_month(history: List[HistoryItem], month_num: int = 0) -> Hist
 
     start_date = datetime(target_year, target_month, 1).date()
     end_date = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    
+
     filtered_history = [
         entry
         for entry in history
@@ -442,19 +443,19 @@ def get_history_by_month(history: List[HistoryItem], month_num: int = 0) -> Hist
 def get_history_by_week(history: List[HistoryItem], week_num: int = 0, start_on_monday: bool = True) -> HistoryByWeek:
     current_date = datetime.now()
 
-    
+
     # Adjust the start day of the week based on user preference
     if start_on_monday:
         start_day_adjustment = (current_date.weekday() + 7) % 7
-    
+
     else:  # If start_on_monday is False, the week starts on Sunday
         start_day_adjustment = (current_date.weekday() + 1) % 7
-    
+
     week_start_day = (current_date - timedelta(days=start_day_adjustment)).date()
-    
+
     start_date = week_start_day - timedelta(days=7 * week_num)
     end_date = start_date + timedelta(days=6)
-    
+
     filtered_history = [
         entry
         for entry in history
@@ -480,7 +481,7 @@ def get_search_engine_percentages(
     hide_complements: bool = True
 ) -> Dict[str, Any]:
     """
-    Processes search history to calculate the percentage of searches done on 
+    Processes search history to calculate the percentage of searches done on
     different search engines over a specified number of weeks.
 
     :param history: List of search history entries.
@@ -527,7 +528,7 @@ def get_search_engine_percentages(
         reverse=True,
     )
 
-    
+
     # Return the search engine data and the start and end dates for the week
     return {
         "label": "month" if by_month else f"week",
@@ -549,9 +550,9 @@ def get_search_entry_by_datetime(history: List[Dict[str, Any]], datetime_str: st
 
 def get_random_search_url(history: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     search_history = [
-        entry for entry in history if entry.get("search_query") and 
-        entry.get("search_label", None) not in ["redirect", "duplicate", 
-                                      "chat-based-search-complement", 
+        entry for entry in history if entry.get("search_query") and
+        entry.get("search_label", None) not in ["redirect", "duplicate",
+                                      "chat-based-search-complement",
                                       "not-url-based"]
     ]
     return random.choice(search_history) if search_history else None
