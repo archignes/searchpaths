@@ -1,117 +1,68 @@
-import argparse
 import os
-from datetime import datetime
-from termcolor import cprint
+from pyfzf.pyfzf import FzfPrompt   # type: ignore
 
-from pyfzf import FzfPrompt
+from config import HISTORY_DATABASE_PATHS, HTU_PROFILE_PATH
+from extract import get_random_search_url, get_search_entry_by_datetime
+from load import get_history, save_cache
+from process import get_search_history
+from show import (
+    dive_into_search_context,
+    fzf_search_queries,
+    interact_with_user_for_search_data
+)
 
-import config
-import extract
-import show
+def process_history(browser_choice, data_path, args):
+    print(f"Processing history from {browser_choice} database...")
+    history = get_history(data_path)
+    search_history = get_search_history(history)
 
-from tests.test_mock_history import MOCK_HISTORY
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process browser history.")
-    parser.add_argument(
-        "-b",
-        "--browser",
-        choices=config.HISTORY_DATABASE_PATHS.keys(),
-        help="Choose the browser's history to process.",
-    )
-    parser.add_argument(
-        "-htu",
-        "--htu",
-        action="store_true",
-        help="Load history from the HTU database.",
-    )
-    parser.add_argument(
-        "-r",
-        "--random",
-        action="store_true",
-        help="Show a random entry in deep context.",
-    )
-    parser.add_argument(
-        "-d",
-        "--date",
-        type=str,
-        help="Show entries from a specific datetime (YYYY-MM-DD HH:MM:SS).",
-    )
-    parser.add_argument(
-        "-t",
-        "--test",
-        action="store_true",
-        help="Load the mock history for interactive demo.",
-    )
-    parser.add_argument(
-        "-z",
-        "--fzf",
-        action="store_true",
-        help="Use fzf to search for and select a search query from your history.",
-    )
-
-    args = parser.parse_args()
-
-    if args.browser or args.htu:
-        if args.browser:
-            browser_choice = args.browser
-            data_path = os.path.expanduser(config.HISTORY_DATABASE_PATHS[browser_choice])
-        if args.htu:
-            browser_choice = "HTU sync"
-            data_path = "htu"
-        print(f"Processing history from {browser_choice} database...")
-        history = extract.get_history(data_path)
-        if args.random:
-            random_url = extract.get_random_search_url(history)
-            show.dive_into_search_context(random_url)
-        elif args.date:
-            search_entry = extract.get_search_entry_by_datetime(history, args.date)
-            if search_entry:
-                show.dive_into_search_context(search_entry)
-            else:
-                print(f"No entries found for {args.date}")
-        elif args.fzf:
-            show.fzf_search_queries(history)
+    if args.random:
+        random_url = get_random_search_url(search_history)
+        if random_url:
+            dive_into_search_context(random_url)
+    elif args.date:
+        search_entry = get_search_entry_by_datetime(search_history, args.date)
+        if search_entry:
+            dive_into_search_context(search_entry)
         else:
-            show.interact_with_user_for_search_data(history)
-    elif args.test:
-        history = extract.add_search_data_to_history(MOCK_HISTORY)
-        extract.save_cache(history)
-        show.interact_with_user_for_search_data(history)
+            print(f"No entries found for {args.date}")
+    elif args.fzf:
+        fzf_search_queries(search_history)
     else:
-        available_sources = []
-        for browser_choice in config.HISTORY_DATABASE_PATHS:
-            if os.path.exists(config.HISTORY_DATABASE_PATHS[browser_choice]):
-                available_sources.append(browser_choice)
-            else:
-                print(f"The specified path does not exist: {config.HISTORY_DATABASE_PATHS[browser_choice]}")
-        if config.HTU_PROFILE_PATH and os.path.exists(config.HTU_PROFILE_PATH):
-            available_sources.append("HTU sync")
-        if not available_sources:
-            print("No available sources found. Exiting...")
-            exit(1)
-        fzf = FzfPrompt()
-        selected_source = fzf.prompt(available_sources, "--prompt='Select a source: '")[0]
-        if selected_source:
-            print(f"Processing history from {selected_source} database...")
-            if selected_source == "HTU sync":
-                history = extract.get_history("htu")
-            else:
-                data_path = os.path.expanduser(config.HISTORY_DATABASE_PATHS[selected_source])
-                history = extract.get_history(data_path)
-            show.interact_with_user_for_search_data(history)
+        interact_with_user_for_search_data(search_history)
+
+def process_test_history():
+    history = get_history("tests/mock_history_simple.json")
+    search_history = get_search_history(history)
+    save_cache(search_history)
+    interact_with_user_for_search_data(search_history)
+
+def get_available_sources():
+    available_sources = []
+    for browser_choice in HISTORY_DATABASE_PATHS:
+        if os.path.exists(HISTORY_DATABASE_PATHS[browser_choice]):
+            available_sources.append(browser_choice)
+        else:
+            print(
+                f"The specified path does not exist: {HISTORY_DATABASE_PATHS[browser_choice]}"
+            )
+    if HTU_PROFILE_PATH and os.path.exists(HTU_PROFILE_PATH):
+        available_sources.append("HTU sync")
+    return available_sources
+
+def select_source(available_sources):
+    if not available_sources:
+        print("No available sources found. Exiting...")
         exit(1)
+    fzf = FzfPrompt()
+    selected_source = fzf.prompt(available_sources, "--prompt='Select a source: '")[
+        0
+    ]
+    return selected_source
 
-    # Calculate the length of the history
-    history_length = len(history)
-    cprint(f"\nTotal history entries: {history_length}\n", "yellow")
-
-    # Group history entries by month
-    history_by_month = {}
-    for entry in history:
-        month = datetime.strptime(
-            entry["last_visit_time"], "%Y-%m-%d %H:%M:%S"
-        ).strftime("%Y-%m")
-        if month not in history_by_month:
-            history_by_month[month] = []
-        history_by_month[month].append(entry)
+def get_data_path(selected_source):
+    if selected_source == "HTU sync":
+        data_path = "htu_sync"
+    else:
+        data_path = os.path.expanduser(HISTORY_DATABASE_PATHS[selected_source])
+    return data_path

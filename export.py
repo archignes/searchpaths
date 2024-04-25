@@ -1,6 +1,7 @@
 import csv
-from datetime import datetime
 import os
+import json
+from datetime import datetime
 from urllib.parse import urlparse
 
 
@@ -17,10 +18,19 @@ def format_entry_for_file(entry):
         return formatted_entry
     return None
 
+def save_to_json(history, timestamp, dir):
+    json_filename = f"search_queries_{timestamp}.json"
+    # Convert datetime objects to strings
+    for entry in history:
+        if 'last_visit_time' in entry and isinstance(entry['last_visit_time'], datetime):
+            entry['last_visit_time'] = entry['last_visit_time'].isoformat()
+    with open(dir + json_filename, "w") as file:
+        json.dump(history, file)
+    return json_filename
 
 def save_to_csv(history, timestamp):
     csv_filename = f"search_queries_{timestamp}.csv"
-    with open(csv_filename, "w", newline="") as file:
+    with open(dir + csv_filename, "w", newline="") as file:
         writer = csv.writer(file)
         # Add 'URL' to the header
         writer.writerow(["Date", "Root Domain", "Search Query", "URL"])
@@ -33,7 +43,7 @@ def save_to_csv(history, timestamp):
 
 def save_to_txt(history, timestamp):
     txt_filename = f"search_queries_{timestamp}.txt"
-    with open(txt_filename, "w") as file:
+    with open(dir + txt_filename, "w") as file:
         for entry in history:
             formatted_entry = format_entry_for_file(entry)
 
@@ -48,26 +58,25 @@ def export_searches(data):
         "Choose the file format to export search queries with `last_visit_time` and root domain:\n"
         "1: csv\n"
         "2: txt\n"
-        "3: both\n"
+        "3: json\n"
         "Q: quit\n"
         ": "
     ).lower()
-    formats = {"1": "csv", "2": "txt", "3": "both", "q": "quit"}
+    formats = {"1": "csv", "2": "txt", "3": "json", "q": "quit"}
     file_format = formats.get(choice)
     if file_format == "quit":
         print("Export canceled.")
         return
-    files_to_open = []
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-
-    if file_format in ["csv", "both"]:
-        csv_filename = save_to_csv(data, timestamp)
-        files_to_open.append(csv_filename)
-    if file_format in ["txt", "both"]:
-        txt_filename = save_to_txt(data, timestamp)
-        files_to_open.append(txt_filename)
-    # print the files to open
-    print(f"Exported files: {files_to_open}")
+    dir = "exports/"
+    if file_format in ["csv"]:
+        export_filename = save_to_csv(data, timestamp, dir)
+    if file_format in ["txt"]:
+        export_filename = save_to_txt(data, timestamp, dir)
+    if file_format == "json":
+        export_filename = save_to_json(data, timestamp, dir)
+        
+    # print the files to ope    n
+    print(f"Exported file: {export_filename}")
     # Open the saved files for the user
-    for filename in files_to_open:
-        os.system(f"open {filename}")
+    os.system(f"open {export_filename}")

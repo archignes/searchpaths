@@ -96,7 +96,7 @@ The `config.py` file contains various configuration options:
 - `HISTORY_DATABASE_PATHS`: Specify the paths to your browser's history database.
 - `SKIP_DOMAINS`: List of domains to exclude from the search history analysis.
 - `SITE_SEARCH_DOMAINS`: List of domains to consider as site-specific searches.
-- `LOGGABLE_SEARCH_SYSTEMS`: List of search systems that may not have query strings in the URL.
+- `INCLUDED_SEARCH_SYSTEMS`: List of search systems that may not have query strings in the URL.
 - `CHAT_BASED_SEARCH_COMPLEMENTS`: List of chat-based search complements.
 
 ## Testing
@@ -109,6 +109,18 @@ To run the tests, use the following command:
 pytest tests/
 ```
 
+or pytest-watch
+
+```
+ptw
+```
+
+
+Run mypy to check the types
+
+```
+p -m mypy .
+```
 
 ## License
 

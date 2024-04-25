@@ -1,4 +1,3 @@
-
 # You can find your profile path by opening Chrome or Brave and going to
 # chrome://version/ or brave://version/
 # Then look for the "Profile Path" heading.
@@ -10,20 +9,18 @@
 HISTORY_DATABASE_PATHS = {
     "Chrome": "/Users/dsg/Library/Application Support/Google/Chrome/Default",
     "Brave": "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6",
-    "HTUexport": "external_data/htu_analyze_20240424_133319.tsv"
+    "HTUexport": "external_data/htu_analyze_20240424_133319.tsv",
 }
 
 # This can be used to access the HTU history database without manual export.
 # It will be synced as of the last time the extension was used OR the browser was restarted.
-HTU_PROFILE_PATH = "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6"
+HTU_PROFILE_PATH = (
+    "/Users/dsg/Library/Application Support/BraveSoftware/Brave-Browser/Profile 6"
+)
 
 # Filtering and Processing Configurations
 
-SKIP_DOMAINS = [
-    "http://localhost",
-    "https://instantdomains.com",
-    "*.vercel.app"
-]
+SKIP_DOMAINS = ["http://localhost", "https://instantdomains.com", "*.vercel.app"]
 
 SITE_SEARCH_DOMAINS = [
     "https://searchjunct.com",
@@ -31,11 +28,11 @@ SITE_SEARCH_DOMAINS = [
     "https://danielsgriffin.com",
     "https://twitter.com",
     "https://www.tiktok.com",
-    "https://github.com"
+    "https://github.com",
 ]
 
 # These are search systems that may not always (or ever) have query strings indicated in search pages.
-LOGGABLE_SEARCH_SYSTEMS = [
+INCLUDED_SEARCH_SYSTEMS = [
     "https://www.findera.ai/",
     "https://you.com/",
     "https://chat.openai.com/",
@@ -49,11 +46,13 @@ LOGGABLE_SEARCH_SYSTEMS = [
     "https://search.lepton.run/",
     "https://morphic.sh/",
     "https://gemini.google.com/app",
-    "https://claude.ai/chat/"
+    "https://claude.ai/chat/",
 ]
 
 CHAT_BASED_SEARCH_COMPLEMENTS = [
     "https://claude.ai/chat/",
     "https://chat.openai.com/",
-    "https://gemini.google.com/app"
+    "https://gemini.google.com/app",
 ]
+
+LANDING_PAGE_ONLY_SEARCH_SYSTEMS = ["https://andisearch.com/"]
