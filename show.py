@@ -218,24 +218,6 @@ def list_all_investigation(timespan_data=None, full_history=False):
     investigation_user_interaction(data)
 
 
-def add_search_engine_data(data):
-    search_engine_data = set(
-        [
-            item["search_engine"].replace("www.", "")
-            for item in data["search_history"]
-        ]
-    )
-    updated_data = {}
-    updated_data["search_engines"] = {
-        search_engine: 0 for search_engine in list(search_engine_data)
-    }
-    print(updated_data["search_engines"])
-    updated_data["search_history"] = data["search_history"]
-    updated_data["start_date"] = data["search_history"][0]["last_visit_time"]
-    updated_data["end_date"] = data["search_history"][-1]["last_visit_time"]
-    return updated_data
-
-
 def particular_investigation(data):
     """
     Allows the user to investigate a particular search engine's data.
@@ -243,13 +225,19 @@ def particular_investigation(data):
     Parameters:
     - data: A dictionary containing data for a specific week or all searches.
     """
-    if "search_engines" not in data:
-        data = add_search_engine_data(data)
     fzf = FzfPrompt()
-    search_engine_list = [engine for engine in data["search_engines"].keys()]
+    search_engine_count_string = [f"{engine} ({count})" for engine, count in data["search_engines"]]
     selected_engine = fzf.prompt(
-        search_engine_list, "--prompt='Select a search engine: '"
+        search_engine_count_string, "--prompt='Select a search engine: '"
     )[0]
+    # Convert the search_engine_count_string variant to the engine name
+    selected_engine = selected_engine.split(" (")[0]
+    selected_engine_searches = [
+        entry
+        for entry in data["search_history"]
+        if urlparse(entry["url"]).netloc.replace("www.", "") == selected_engine
+    ]
+
     # Calculate the time range from the start date to the end date or current date
     start_date = data["start_date"]
     end_date = data.get("end_date", datetime.now().date())
@@ -281,12 +269,7 @@ def particular_investigation(data):
         time_phrase = (
             f"from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
         )
-    selected_engine_searches = [
-        entry
-        for entry in data["search_history"]
-        if urlparse(entry["url"]).netloc.replace("www.", "") == selected_engine
-    ]
-
+    
     print(f"\nSearches made with {selected_engine} {time_phrase}:")
     print_history_items(selected_engine_searches)
     investigation_user_interaction(data, selected_engine_searches)

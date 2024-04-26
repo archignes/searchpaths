@@ -135,7 +135,8 @@ def get_htu_history() -> List[HistoryItem]:
             title=title,
             visit_count=visit_counts.get(urlid, 1),
             last_visit_time=formatted_visit_time,
-            last_visit_time_datetime=convert_chrome_time(visit_time),
+            last_visit_time_datetime=datetime.fromtimestamp(
+            float(visit_time) / 1000)
         )
         history_items.append(history_item)
 

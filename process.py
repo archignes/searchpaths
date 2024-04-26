@@ -348,6 +348,8 @@ def get_search_engine_percentages(
         reverse=True,
     )
 
+    sorted_search_engines = [(engine, count) for engine, count in sorted_search_engines]
+
     return {
         "label": "month" if by_month else "day" if full_history else "week",
         "start_date": scoped_history["start_date"],
